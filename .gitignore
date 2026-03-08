@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.egg-info/
+dist/
+build/
+debug_*.html
+*_employee_rows.csv
+*_candidates_rows.csv
+kununu_unternehmen.csv
+kununu_unternehmen.xlsx

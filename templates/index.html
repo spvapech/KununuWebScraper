@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>kununu Bewertungen Scraper</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 560px;
+            padding: 24px;
+        }
+
+        .card {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 40px 36px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4);
+            border: 1px solid #334155;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .logo h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #f8fafc;
+            letter-spacing: -0.5px;
+        }
+
+        .logo h1 span {
+            color: #38bdf8;
+        }
+
+        .logo p {
+            color: #94a3b8;
+            font-size: 14px;
+            margin-top: 6px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #94a3b8;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 14px 16px;
+            background: #0f172a;
+            border: 2px solid #334155;
+            border-radius: 10px;
+            color: #f1f5f9;
+            font-size: 15px;
+            transition: border-color 0.2s;
+            outline: none;
+        }
+
+        input[type="text"]:focus {
+            border-color: #38bdf8;
+        }
+
+        input[type="text"]::placeholder {
+            color: #475569;
+        }
+
+        .options-row {
+            display: flex;
+            gap: 16px;
+        }
+
+        .options-row .form-group {
+            flex: 1;
+        }
+
+        .select-wrapper {
+            position: relative;
+        }
+
+        select {
+            width: 100%;
+            padding: 14px 16px;
+            background: #0f172a;
+            border: 2px solid #334155;
+            border-radius: 10px;
+            color: #f1f5f9;
+            font-size: 15px;
+            appearance: none;
+            cursor: pointer;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        select:focus {
+            border-color: #38bdf8;
+        }
+
+        .select-wrapper::after {
+            content: "▾";
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #64748b;
+            pointer-events: none;
+            font-size: 14px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+            border: none;
+            border-radius: 10px;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 8px;
+            letter-spacing: 0.3px;
+        }
+
+        .btn:hover {
+            background: linear-gradient(135deg, #0284c7, #0ea5e9);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 20px rgba(14, 165, 233, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: #334155;
+            color: #64748b;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Progress */
+        .status-box {
+            display: none;
+            margin-top: 24px;
+            padding: 20px;
+            background: #0f172a;
+            border-radius: 10px;
+            border: 1px solid #334155;
+        }
+
+        .status-box.visible {
+            display: block;
+        }
+
+        .progress-bar-wrap {
+            height: 6px;
+            background: #334155;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 14px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #0ea5e9, #38bdf8);
+            border-radius: 3px;
+            transition: width 0.4s ease;
+        }
+
+        .progress-bar.indeterminate {
+            width: 30%;
+            animation: slide 1.4s ease-in-out infinite;
+        }
+
+        @keyframes slide {
+            0%   { margin-left: 0; }
+            50%  { margin-left: 70%; }
+            100% { margin-left: 0; }
+        }
+
+        .status-text {
+            font-size: 14px;
+            color: #94a3b8;
+        }
+
+        .status-text .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid #334155;
+            border-top-color: #38bdf8;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Downloads */
+        .downloads {
+            display: none;
+            margin-top: 24px;
+        }
+
+        .downloads.visible {
+            display: block;
+        }
+
+        .downloads h3 {
+            font-size: 14px;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+
+        .download-btn {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            padding: 14px 18px;
+            background: #0f172a;
+            border: 2px solid #334155;
+            border-radius: 10px;
+            color: #e2e8f0;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+            margin-bottom: 10px;
+        }
+
+        .download-btn:hover {
+            border-color: #38bdf8;
+            background: #1e293b;
+        }
+
+        .download-btn .icon {
+            width: 36px;
+            height: 36px;
+            background: #334155;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .download-btn .meta {
+            flex: 1;
+        }
+
+        .download-btn .meta .name {
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+
+        .download-btn .meta .info {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 2px;
+        }
+
+        .download-btn .arrow {
+            color: #38bdf8;
+            font-size: 18px;
+        }
+
+        .error-box {
+            display: none;
+            margin-top: 24px;
+            padding: 16px 20px;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 10px;
+            color: #fca5a5;
+            font-size: 14px;
+        }
+
+        .error-box.visible {
+            display: block;
+        }
+
+        .new-btn {
+            display: none;
+            margin-top: 16px;
+        }
+
+        .new-btn.visible {
+            display: block;
+        }
+
+        .new-btn button {
+            width: 100%;
+            padding: 12px;
+            background: transparent;
+            border: 2px solid #334155;
+            border-radius: 10px;
+            color: #94a3b8;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .new-btn button:hover {
+            border-color: #64748b;
+            color: #e2e8f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="logo">
+                <h1><span>kununu</span> Scraper</h1>
+                <p>Mitarbeiter- & Bewerberbewertungen herunterladen</p>
+            </div>
+
+            <form id="scrapeForm">
+                <div class="form-group">
+                    <label for="eingabe">Firmenname oder kununu-URL</label>
+                    <input type="text" id="eingabe" placeholder="z.B. Firmenname oder https://www.kununu.com/de/..." required>
+                </div>
+
+                <div class="options-row">
+                    <div class="form-group">
+                        <label for="typ">Bewertungstyp</label>
+                        <div class="select-wrapper">
+                            <select id="typ">
+                                <option value="beide">Beide</option>
+                                <option value="mitarbeiter">Mitarbeiter</option>
+                                <option value="bewerber">Bewerber</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="format">Format</label>
+                        <div class="select-wrapper">
+                            <select id="format">
+                                <option value="csv">CSV</option>
+                                <option value="xlsx">Excel (XLSX)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn" id="startBtn">Scraping starten</button>
+            </form>
+
+            <div class="status-box" id="statusBox">
+                <div class="progress-bar-wrap">
+                    <div class="progress-bar indeterminate" id="progressBar"></div>
+                </div>
+                <div class="status-text" id="statusText">
+                    <span class="spinner"></span>
+                    <span id="statusMsg">Wird gestartet …</span>
+                </div>
+            </div>
+
+            <div class="error-box" id="errorBox"></div>
+
+            <div class="downloads" id="downloads">
+                <h3>Downloads bereit</h3>
+                <div id="downloadList"></div>
+            </div>
+
+            <div class="new-btn" id="newBtn">
+                <button onclick="zuruecksetzen()">Neue Abfrage</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('scrapeForm');
+        const startBtn = document.getElementById('startBtn');
+        const statusBox = document.getElementById('statusBox');
+        const statusMsg = document.getElementById('statusMsg');
+        const progressBar = document.getElementById('progressBar');
+        const errorBox = document.getElementById('errorBox');
+        const downloads = document.getElementById('downloads');
+        const downloadList = document.getElementById('downloadList');
+        const newBtn = document.getElementById('newBtn');
+
+        let pollTimer = null;
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const eingabe = document.getElementById('eingabe').value.trim();
+            const typ = document.getElementById('typ').value;
+            const fmt = document.getElementById('format').value;
+
+            if (!eingabe) return;
+
+            // UI zurücksetzen
+            startBtn.disabled = true;
+            startBtn.textContent = 'Läuft …';
+            statusBox.classList.add('visible');
+            errorBox.classList.remove('visible');
+            downloads.classList.remove('visible');
+            newBtn.classList.remove('visible');
+            statusMsg.textContent = 'Wird gestartet …';
+            progressBar.classList.add('indeterminate');
+
+            try {
+                const res = await fetch('/api/scrape', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ eingabe, format: fmt, typ }),
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    zeigeFehler(data.error || 'Unbekannter Fehler');
+                    return;
+                }
+
+                polleStatus(data.job_id);
+            } catch (err) {
+                zeigeFehler('Verbindungsfehler: ' + err.message);
+            }
+        });
+
+        function polleStatus(jobId) {
+            pollTimer = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/status/${jobId}`);
+                    const data = await res.json();
+
+                    statusMsg.textContent = data.fortschritt || '…';
+
+                    if (data.status === 'fertig') {
+                        clearInterval(pollTimer);
+                        progressBar.classList.remove('indeterminate');
+                        progressBar.style.width = '100%';
+
+                        // Downloads anzeigen
+                        downloadList.innerHTML = '';
+                        const fmt = data.downloads[0]?.url.includes('xlsx') ? 'XLSX' : 'CSV';
+                        const ext = fmt === 'XLSX' ? 'xlsx' : 'csv';
+
+                        for (const dl of data.downloads) {
+                            const icon = dl.typ === 'mitarbeiter' ? '👥' : '📋';
+                            const typLabel = dl.typ === 'mitarbeiter' ? 'Mitarbeiter' : 'Bewerber';
+                            const dateiname = `${data.firma}_${dl.typ === 'mitarbeiter' ? 'employee_rows' : 'candidates_rows'}`;
+
+                            downloadList.innerHTML += `
+                                <a href="${dl.url}" class="download-btn" download>
+                                    <div class="icon">${icon}</div>
+                                    <div class="meta">
+                                        <div class="name">${typLabel}-Bewertungen</div>
+                                        <div class="info">${dl.label}</div>
+                                    </div>
+                                    <div class="arrow">↓</div>
+                                </a>
+                            `;
+                        }
+
+                        downloads.classList.add('visible');
+                        newBtn.classList.add('visible');
+                        startBtn.disabled = false;
+                        startBtn.textContent = 'Scraping starten';
+                    }
+
+                    if (data.status === 'fehler') {
+                        clearInterval(pollTimer);
+                        zeigeFehler(data.fehler || 'Ein Fehler ist aufgetreten.');
+                    }
+                } catch (err) {
+                    // Weiter versuchen
+                }
+            }, 2000);
+        }
+
+        function zeigeFehler(msg) {
+            statusBox.classList.remove('visible');
+            errorBox.textContent = '⚠ ' + msg;
+            errorBox.classList.add('visible');
+            newBtn.classList.add('visible');
+            startBtn.disabled = false;
+            startBtn.textContent = 'Scraping starten';
+        }
+
+        function zuruecksetzen() {
+            statusBox.classList.remove('visible');
+            errorBox.classList.remove('visible');
+            downloads.classList.remove('visible');
+            newBtn.classList.remove('visible');
+            progressBar.style.width = '0%';
+            progressBar.classList.add('indeterminate');
+            document.getElementById('eingabe').value = '';
+            document.getElementById('eingabe').focus();
+        }
+    </script>
+</body>
+</html>
