@@ -1,7 +1,5 @@
 # kununu Scraper
 
-Web-Scraper für [kununu.com](https://www.kununu.com/) – extrahiert Mitarbeiter- und Bewerberbewertungen beliebiger Unternehmen und exportiert sie als CSV oder Excel. Enthält ein Flask-basiertes Web-Frontend mit Live-Fortschrittsanzeige und direktem Browser-Download sowie eine Terminal-Variante mit interaktiver Eingabe. Nutzt Playwright für zuverlässiges Rendering JavaScript-basierter Inhalte mit automatischer Paginierung und Duplikaterkennung.
-
 Scrapt Unternehmensdaten und Bewertungen von [kununu.com](https://www.kununu.com/) und exportiert sie als **CSV** und/oder **Excel (XLSX)**.
 
 Das Projekt besteht aus drei Komponenten:
