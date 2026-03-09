@@ -74,7 +74,7 @@ def _scrape_job(job_id: str, eingabe: str, fmt: str, typ: str):
                 job["fortschritt"] = "Mitarbeiter-Bewertungen werden geladen …"
                 mitarbeiter = bewertungen_scrapen(
                     firmen_url, "mitarbeiter", page,
-                    max_seiten=50, company_id=1,
+                    max_seiten=50,
                 )
                 ergebnis["mitarbeiter"] = mitarbeiter
                 job["fortschritt"] = f"{len(mitarbeiter)} Mitarbeiter-Bewertungen gefunden."
@@ -84,7 +84,7 @@ def _scrape_job(job_id: str, eingabe: str, fmt: str, typ: str):
                 job["fortschritt"] = "Bewerber-Bewertungen werden geladen …"
                 bewerber = bewertungen_scrapen(
                     firmen_url, "bewerber", page,
-                    max_seiten=50, company_id=1,
+                    max_seiten=50,
                 )
                 ergebnis["bewerber"] = bewerber
                 job["fortschritt"] = f"{len(bewerber)} Bewerber-Bewertungen gefunden."
@@ -259,4 +259,4 @@ def _als_xlsx(daten: list[dict], felder: list[str], dateiname: str):
 
 
 if __name__ == "__main__":
-    app.run(debug=False, port=5000)
+    app.run(debug=False, port=5001)

@@ -64,7 +64,7 @@ MITARBEITER_FELDER = [
     "sternebewertung_umgang_mit_aelteren_kollegen",
     "sternebewertung_arbeitsbedingungen",
     "sternebewertung_gleichberechtigung",
-    "created_at", "updated_at", "company_id",
+    "created_at", "updated_at",
     "arbeitsatmosphaere", "image", "work_life_balance",
     "karriere_weiterbildung", "gehalt_sozialleistungen",
     "kollegenzusammenhalt", "umwelt_sozialbewusstsein",
@@ -86,7 +86,7 @@ BEWERBER_FELDER = [
     "sternebewertung_erwartbarkeit_des_prozesses",
     "sternebewertung_zeitgerechte_zu_oder_absage",
     "sternebewertung_schnelle_antwort",
-    "created_at", "updated_at", "company_id",
+    "created_at", "updated_at",
 ]
 
 # ---------------------------------------------------------------------------
@@ -366,14 +366,13 @@ def _rekursiv_suchen(obj, typ: str, tiefe: int = 0) -> list[dict] | None:
     return None
 
 
-def mitarbeiter_aus_json(raw_reviews: list[dict], company_id: int) -> list[dict]:
+def mitarbeiter_aus_json(raw_reviews: list[dict]) -> list[dict]:
     """Konvertiert rohe JSON-Bewertungsdaten in das CSV-Format (Mitarbeiter)."""
     ergebnisse = []
     jetzt = jetzt_iso()
 
     for r in raw_reviews:
         row = {f: "" for f in MITARBEITER_FELDER}
-        row["company_id"] = company_id
         row["created_at"] = jetzt
         row["updated_at"] = jetzt
 
@@ -435,14 +434,13 @@ def mitarbeiter_aus_json(raw_reviews: list[dict], company_id: int) -> list[dict]
     return ergebnisse
 
 
-def bewerber_aus_json(raw_reviews: list[dict], company_id: int) -> list[dict]:
+def bewerber_aus_json(raw_reviews: list[dict]) -> list[dict]:
     """Konvertiert rohe JSON-Bewertungsdaten in das CSV-Format (Bewerber)."""
     ergebnisse = []
     jetzt = jetzt_iso()
 
     for r in raw_reviews:
         row = {f: "" for f in BEWERBER_FELDER}
-        row["company_id"] = company_id
         row["created_at"] = jetzt
         row["updated_at"] = jetzt
 
@@ -806,7 +804,7 @@ def bewerber_bewertung_aus_html(container) -> dict:
 # Seiten-Parsing (kombiniert JSON + HTML)
 # ---------------------------------------------------------------------------
 
-def bewertungen_von_seite(soup: BeautifulSoup, typ: str, company_id: int) -> list[dict]:
+def bewertungen_von_seite(soup: BeautifulSoup, typ: str) -> list[dict]:
     """Parst alle Bewertungen einer Seite (JSON oder HTML Fallback)."""
     kategorien = MITARBEITER_KATEGORIEN if typ == "mitarbeiter" else BEWERBER_KATEGORIEN
 
@@ -817,9 +815,9 @@ def bewertungen_von_seite(soup: BeautifulSoup, typ: str, company_id: int) -> lis
         if raw:
             log.info("  → %d Bewertungen aus JSON-Daten extrahiert", len(raw))
             if typ == "mitarbeiter":
-                return mitarbeiter_aus_json(raw, company_id)
+                return mitarbeiter_aus_json(raw)
             else:
-                return bewerber_aus_json(raw, company_id)
+                return bewerber_aus_json(raw)
 
     # Strategie 2: Eingebettetes JSON suchen (andere Script-Tags)
     for script in soup.find_all("script", type="application/json"):
@@ -831,9 +829,9 @@ def bewertungen_von_seite(soup: BeautifulSoup, typ: str, company_id: int) -> lis
             if raw:
                 log.info("  → %d Bewertungen aus eingebettetem JSON", len(raw))
                 if typ == "mitarbeiter":
-                    return mitarbeiter_aus_json(raw, company_id)
+                    return mitarbeiter_aus_json(raw)
                 else:
-                    return bewerber_aus_json(raw, company_id)
+                    return bewerber_aus_json(raw)
         except (json.JSONDecodeError, TypeError):
             continue
 
@@ -853,7 +851,6 @@ def bewertungen_von_seite(soup: BeautifulSoup, typ: str, company_id: int) -> lis
 
         # Nur hinzufügen wenn Titel vorhanden
         if row.get("titel"):
-            row["company_id"] = company_id
             row["created_at"] = jetzt_iso()
             row["updated_at"] = jetzt_iso()
             ergebnisse.append(row)
@@ -954,7 +951,6 @@ def bewertungen_scrapen(
     typ: str,
     page,
     max_seiten: int,
-    company_id: int,
     debug: bool = False,
 ) -> list[dict]:
     """Scrapt alle Bewertungen eines Typs (mitarbeiter/bewerber) mit Paginierung."""
@@ -973,7 +969,7 @@ def bewertungen_scrapen(
             debug_datei.write_text(soup.prettify(), encoding="utf-8")
             log.info("  → Debug-HTML gespeichert: %s", debug_datei)
 
-        bewertungen = bewertungen_von_seite(soup, typ, company_id)
+        bewertungen = bewertungen_von_seite(soup, typ)
 
         if not bewertungen:
             if seite_nr == 1:
@@ -1095,7 +1091,7 @@ def main():
         log.info("Starte Mitarbeiter-Bewertungen …")
         mitarbeiter = bewertungen_scrapen(
             firmen_url, "mitarbeiter", page,
-            max_seiten=50, company_id=1,
+            max_seiten=50,
         )
         datei = f"{slug}_employee_rows.csv"
         als_csv_speichern(mitarbeiter, MITARBEITER_FELDER, datei)
@@ -1105,7 +1101,7 @@ def main():
         log.info("Starte Bewerber-Bewertungen …")
         bewerber = bewertungen_scrapen(
             firmen_url, "bewerber", page,
-            max_seiten=50, company_id=1,
+            max_seiten=50,
         )
         datei = f"{slug}_candidates_rows.csv"
         als_csv_speichern(bewerber, BEWERBER_FELDER, datei)
