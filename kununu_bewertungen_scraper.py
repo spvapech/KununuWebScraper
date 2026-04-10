@@ -1,19 +1,5 @@
 #!/usr/bin/env python3
-"""
-kununu Bewertungen Scraper
 
-Scrapt Mitarbeiter- und Bewerberbewertungen eines Unternehmens von kununu.com
-und exportiert sie als CSV-Dateien (employee_rows.csv, candidates_rows.csv).
-
-Nutzung:
-    python kununu_bewertungen_scraper.py "PLEdoc"
-    python kununu_bewertungen_scraper.py --url https://www.kununu.com/de/pledoc
-    python kununu_bewertungen_scraper.py "Deutsche Post" --max-seiten 10
-
-Voraussetzungen:
-    pip install requests beautifulsoup4 playwright
-    python -m playwright install chromium
-"""
 
 import csv
 import json
@@ -109,6 +95,23 @@ MITARBEITER_KATEGORIEN = {
     "Gleichberechtigung": "gleichberechtigung",
 }
 
+# JSON API id → CSV-Feld-Fragment (Mitarbeiter)
+MITARBEITER_ID_MAP = {
+    "atmosphere": "arbeitsatmosphaere",
+    "image": "image",
+    "workLife": "work_life_balance",
+    "career": "karriere_weiterbildung",
+    "salary": "gehalt_sozialleistungen",
+    "environment": "umwelt_sozialbewusstsein",
+    "teamwork": "kollegenzusammenhalt",
+    "oldColleagues": "umgang_mit_aelteren_kollegen",
+    "leadership": "vorgesetztenverhalten",
+    "workConditions": "arbeitsbedingungen",
+    "communication": "kommunikation",
+    "equality": "gleichberechtigung",
+    "tasks": "interessante_aufgaben",
+}
+
 BEWERBER_KATEGORIEN = {
     "Erklärung der weiteren Schritte": "erklaerung_der_weiteren_schritte",
     "Zufriedenstellende Reaktion": "zufriedenstellende_reaktion",
@@ -122,6 +125,20 @@ BEWERBER_KATEGORIEN = {
     "Schnelle Antwort": "schnelle_antwort",
 }
 
+# JSON API id → CSV-Feld-Fragment (Bewerber)
+BEWERBER_ID_MAP = {
+    "nextSteps": "erklaerung_der_weiteren_schritte",
+    "reaction": "zufriedenstellende_reaktion",
+    "information": "vollstaendigkeit_der_infos",
+    "interviewResponses": "zufriedenstellende_antworten",
+    "interviewAtmosphere": "angenehme_atmosphaere",
+    "professionalism": "professionalitaet_des_gespraechs",
+    "appreciation": "wertschaetzende_behandlung",
+    "predictability": "erwartbarkeit_des_prozesses",
+    "interviewResult": "zeitgerechte_zu_oder_absage",
+    "responsiveness": "schnelle_antwort",
+}
+
 # Übersetzung der reviewer-Rollen auf kununu → CSV-Werte
 MITARBEITER_TYP_MAP = {
     "Angestellte/r oder Arbeiter/in": "employee",
@@ -133,6 +150,14 @@ MITARBEITER_TYP_MAP = {
     "Zeitarbeit": "temp",
     "Freelancer": "freelancer",
     "Praktikant/in": "intern",
+    # JSON API values (already in English)
+    "employee": "employee",
+    "manager": "manager",
+    "intern": "intern",
+    "trainee": "trainee",
+    "student": "student",
+    "freelancer": "freelancer",
+    "temp": "temp",
 }
 
 BEWERBER_STATUS_MAP = {
@@ -141,6 +166,10 @@ BEWERBER_STATUS_MAP = {
     "Eingestellt": "hired",
     "Hat sich beworben": "",
     "Bewerber/in hat sich selbst anders entschieden": "",
+    # JSON API values
+    "hired": "hired",
+    "rejected": "deferred",
+    "deferred": "deferred",
 }
 
 
@@ -346,11 +375,19 @@ def _rekursiv_suchen(obj, typ: str, tiefe: int = 0) -> list[dict] | None:
             ["reviews", "commentList", "comments", "employeeReviews"]
             if typ == "mitarbeiter"
             else ["applications", "applicationReviews", "candidateReviews",
-                  "bewerbungen"]
+                  "bewerbungen", "reviews"]
         )
+        expected_type = "employer" if typ == "mitarbeiter" else "application"
         for key in suchbegriffe:
             if key in obj and isinstance(obj[key], list) and obj[key]:
-                return obj[key]
+                lst = obj[key]
+                # Filter by review type when both types share the "reviews" key
+                typed = [x for x in lst if isinstance(x, dict) and x.get("type") == expected_type]
+                if typed:
+                    return typed
+                # Fallback: return all if no type field present
+                if lst and isinstance(lst[0], dict) and "type" not in lst[0]:
+                    return lst
 
         for val in obj.values():
             result = _rekursiv_suchen(val, typ, tiefe + 1)
@@ -383,15 +420,17 @@ def mitarbeiter_aus_json(raw_reviews: list[dict]) -> list[dict]:
         date_str = r.get("date", "") or r.get("createdAt", "") or r.get("datum", "")
         row["datum"] = datum_parsen(str(date_str)) if date_str else ""
 
-        # Status (1.0 = aktuell, 0.0 = ehemalig)
+        # Status: former=True → ehemalig (0.0), sonst aktuell (1.0)
+        former = r.get("former", None)
         reviewer_type = r.get("reviewerType", "") or r.get("employeeType", "")
-        if isinstance(reviewer_type, str) and "ex" in reviewer_type.lower():
+        position_json = r.get("position", "")  # JSON API: "employee", "manager", etc.
+        if former is True or (isinstance(reviewer_type, str) and "ex" in reviewer_type.lower()):
             row["status"] = 0.0
-        elif reviewer_type:
+        elif position_json or reviewer_type:
             row["status"] = 1.0
 
         # Jobbeschreibung: "typ, abteilung"
-        typ_label = reviewer_type
+        typ_label = position_json or reviewer_type
         for prefix in ("Ex-", "ex-"):
             if isinstance(typ_label, str):
                 typ_label = typ_label.removeprefix(prefix)
@@ -399,14 +438,45 @@ def mitarbeiter_aus_json(raw_reviews: list[dict]) -> list[dict]:
         abteilung = r.get("department", "") or r.get("abteilung", "") or "Sonstige"
         row["jobbeschreibung"] = f"{mitarbeiter_typ}, {abteilung}"
 
-        # Textfelder
-        row["gut_am_arbeitgeber_finde_ich"] = r.get("pro", "") or r.get("positive", "")
-        row["schlecht_am_arbeitgeber_finde_ich"] = r.get("contra", "") or r.get("negative", "")
-        row["verbesserungsvorschlaege"] = r.get("suggestions", "") or r.get("improvement", "")
+        # Textfelder: aus "texts"-Array (pro/contra/suggestion) oder direkte Felder
+        texts_list = r.get("texts", [])
+        if isinstance(texts_list, list):
+            for t in texts_list:
+                typ_text = t.get("type", "")
+                text_val = t.get("text", "") or ""
+                if typ_text == "pro":
+                    row["gut_am_arbeitgeber_finde_ich"] = text_val
+                elif typ_text == "contra":
+                    row["schlecht_am_arbeitgeber_finde_ich"] = text_val
+                elif typ_text in ("suggestion", "improvement"):
+                    row["verbesserungsvorschlaege"] = text_val
+        if not row["gut_am_arbeitgeber_finde_ich"]:
+            row["gut_am_arbeitgeber_finde_ich"] = r.get("pro", "") or r.get("positive", "")
+        if not row["schlecht_am_arbeitgeber_finde_ich"]:
+            row["schlecht_am_arbeitgeber_finde_ich"] = r.get("contra", "") or r.get("negative", "")
+        if not row["verbesserungsvorschlaege"]:
+            row["verbesserungsvorschlaege"] = r.get("suggestions", "") or r.get("improvement", "")
 
-        # Sternebewertungen
-        ratings = r.get("ratings", {}) or r.get("categories", {})
-        if isinstance(ratings, dict):
+        # Sternebewertungen + Kategorie-Texte
+        ratings = r.get("ratings", []) or r.get("categories", [])
+        if isinstance(ratings, list):
+            # Neues Format: Array von {id, score, roundedScore, text}
+            for rating in ratings:
+                rid = rating.get("id", "")
+                score = rating.get("score")
+                if score is None:
+                    score = rating.get("roundedScore")
+                text = rating.get("text") or ""
+                feld = MITARBEITER_ID_MAP.get(rid)
+                if feld:
+                    if score is not None:
+                        try:
+                            row[f"sternebewertung_{feld}"] = f"{float(score):.2f}"
+                        except (ValueError, TypeError):
+                            pass
+                    if text:
+                        row[feld] = text
+        elif isinstance(ratings, dict):
             _map_sterne_json(ratings, row, MITARBEITER_KATEGORIEN, "sternebewertung_")
 
         # Gesamtbewertung
@@ -421,7 +491,7 @@ def mitarbeiter_aus_json(raw_reviews: list[dict]) -> list[dict]:
         else:
             _berechne_durchschnitt(row, MITARBEITER_KATEGORIEN)
 
-        # Kategorie-Textkommentare
+        # Kategorie-Textkommentare (altes Format)
         comments = r.get("categoryComments", {}) or r.get("categoryTexts", {})
         if isinstance(comments, dict):
             for label, feld in MITARBEITER_KATEGORIEN.items():
@@ -454,10 +524,32 @@ def bewerber_aus_json(raw_reviews: list[dict]) -> list[dict]:
         row["status"] = BEWERBER_STATUS_MAP.get(status_raw, status_raw)
 
         row["stellenbeschreibung"] = r.get("position", "") or r.get("jobTitle", "")
-        row["verbesserungsvorschlaege"] = r.get("suggestions", "") or r.get("improvement", "")
 
-        ratings = r.get("ratings", {}) or r.get("categories", {})
-        if isinstance(ratings, dict):
+        # Verbesserungsvorschläge aus texts-Array oder direktem Feld
+        texts_list = r.get("texts", [])
+        if isinstance(texts_list, list):
+            for t in texts_list:
+                if t.get("type", "") in ("suggestion", "improvement"):
+                    row["verbesserungsvorschlaege"] = t.get("text", "") or ""
+        if not row["verbesserungsvorschlaege"]:
+            row["verbesserungsvorschlaege"] = r.get("suggestions", "") or r.get("improvement", "")
+
+        # Sternebewertungen
+        ratings = r.get("ratings", []) or r.get("categories", [])
+        if isinstance(ratings, list):
+            # Neues Format: Array von {id, score, roundedScore, text}
+            for rating in ratings:
+                rid = rating.get("id", "")
+                score = rating.get("score")
+                if score is None:
+                    score = rating.get("roundedScore")
+                feld = BEWERBER_ID_MAP.get(rid)
+                if feld and score is not None:
+                    try:
+                        row[f"sternebewertung_{feld}"] = f"{float(score):.2f}"
+                    except (ValueError, TypeError):
+                        pass
+        elif isinstance(ratings, dict):
             _map_sterne_json(ratings, row, BEWERBER_KATEGORIEN, "sternebewertung_")
 
         overall = r.get("score", None) or r.get("rating", None)
